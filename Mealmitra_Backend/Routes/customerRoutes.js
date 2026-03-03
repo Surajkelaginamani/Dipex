@@ -20,5 +20,6 @@ router.put('/subscriptions/:id/holidays', authMiddleware, customerController.upd
 
 router.get('/profile', authMiddleware, customerController.getProfile);
 router.put('/profile', authMiddleware, customerController.updateProfile);
-
+// Payment Route
+router.get('/payments', authMiddleware, customerController.getCustomerPayments);
 module.exports = router;

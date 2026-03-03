@@ -108,18 +108,18 @@ const Sign_up = () => {
       <div className="mt-12 text-center space-y-4">
         <p className="text-gray-500 text-sm">
           Already have an account?{' '}
-          <h1 onClick={()=>{
+          <button onClick={()=>{
             navigate("/login") 
-          }} className="text-orange-600 font-semibold hover:underline"> 
+          }} className="text-orange-600 font-semibold hover:underline cursor-pointer bg-none border-none"> 
             Sign in here
-          </h1>
+          </button>
         </p>
         <div>
-          <h1 onClick={()=>{
+          <button onClick={()=>{
             navigate("/")
-          }} className="text-gray-500 text-sm font-medium hover:text-gray-900 transition-colors">
+          }} className="text-gray-500 text-sm font-medium hover:text-gray-900 transition-colors cursor-pointer bg-none border-none">
             Back to Home
-          </h1>
+          </button>
         </div>
       </div>
 

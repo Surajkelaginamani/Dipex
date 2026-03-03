@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, IndianRupee, ChefHat, ClipboardList, Star, Calendar, UserPlus, MapPin,ArrowRight,
   Megaphone, PauseCircle, PhoneCall, Home,
-  CheckCircle, Loader 
+  CheckCircle, Loader ,Settings
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -75,7 +75,7 @@ const VendorDashboard = () => {
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8">
       
-      {/* --- Header Section --- */}
+   {/* --- Header Section --- */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Vendor Dashboard</h1>
@@ -85,18 +85,28 @@ const VendorDashboard = () => {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          <button className="flex items-center gap-2 bg-white border border-red-200 text-red-600 px-4 py-2 rounded-xl font-bold hover:bg-red-50 hover:border-red-300 transition-all shadow-sm group">
-            <PauseCircle size={20} className="group-hover:scale-110 transition-transform" />
-            <span>Pause Deliveries</span>
+          
+          {/* NEW: PROFILE / SETTINGS BUTTON */}
+          <button 
+            onClick={() => navigate('/vendor-profile')} // Make sure this matches your App.js route!
+            className="p-2.5 bg-white border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 hover:text-green-600 transition-colors shadow-sm"
+            title="Kitchen Settings & Profile"
+          >
+            <Settings size={20} />
           </button>
 
-          <div className="bg-white border border-gray-200 px-4 py-2 rounded-xl shadow-sm flex items-center gap-2">
+          <button className="flex items-center gap-2 bg-white border border-red-200 text-red-600 px-4 py-2 rounded-xl font-bold hover:bg-red-50 hover:border-red-300 transition-all shadow-sm group">
+            <PauseCircle size={20} className="group-hover:scale-110 transition-transform" />
+            <span className="hidden sm:inline">Pause Deliveries</span>
+          </button>
+
+          <div className="bg-white border border-gray-200 px-4 py-2 rounded-xl shadow-sm flex items-center gap-2 hidden md:flex">
             <Calendar size={18} className="text-orange-500" />
             <span className="text-sm font-medium text-gray-600">{currentDate}</span>
           </div> 
           
           <button onClick={() => navigate('/locations')} className="px-4 py-2 bg-orange-50 text-orange-700 text-sm font-bold rounded-xl border border-orange-200 hover:bg-orange-100 transition-colors flex items-center gap-2 shadow-sm">
-            <MapPin size={16} /> Location Summary
+            <MapPin size={16} /> <span className="hidden sm:inline">Locations</span>
           </button>
         </div>
       </div>
@@ -203,12 +213,22 @@ const VendorDashboard = () => {
             </div>
           )}
 
-          {/* TAB 2: PAYMENT TRACKER (Kept static for now) */}
+          {/* TAB 2: PAYMENT TRACKER */}
           {activeTab === 'payments' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden min-h-[300px] flex items-center justify-center">
-               <div className="p-8 text-center text-gray-500 font-medium">
-                 Payment tracking logic goes here!
-               </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden min-h-[300px] flex flex-col items-center justify-center p-8 text-center">
+              <div className="w-16 h-16 bg-green-50 text-green-600 rounded-full flex items-center justify-center mb-4 shadow-sm border border-green-100">
+                <IndianRupee size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Financial Overview</h3>
+              <p className="text-gray-500 text-sm max-w-sm mb-6">
+                Track pending renewals, manage student dues, and view your complete paid transaction history.
+              </p>
+              <button 
+                onClick={() => navigate('/Payment_Status')}
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+              >
+                Open Payment Records <ArrowRight size={18} />
+              </button>
             </div>
           )}
         </div>

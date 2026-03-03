@@ -307,3 +307,185 @@ exports.getVendorStudents = async (req, res) => {
     res.status(500).json({ message: 'Server error fetching students' });
   }
 };
+
+// --- Get Vendor Profile Settings ---
+exports.getVendorProfileSettings = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // Get base user info (Name, Phone, Email)
+    const user = await User.findById(userId).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Get specific vendor business info
+    const vendorProfile = await VendorProfile.findOne({ vendorId: userId });
+    if (!vendorProfile) return res.status(404).json({ message: 'Vendor profile not found' });
+
+    // Combine them into one clean object for the frontend
+    res.status(200).json({
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      businessName: vendorProfile.businessName,
+      serviceArea: vendorProfile.serviceArea,
+      serviceType: vendorProfile.serviceType,
+      foodType: vendorProfile.foodType,
+      deliveryType: vendorProfile.deliveryType,
+      monthlyFee: vendorProfile.monthlyFee,
+      halfTiffinMonthlyPrice: vendorProfile.halfTiffinMonthlyPrice,
+      singleTiffinPrice: vendorProfile.singleTiffinPrice
+    });
+
+  } catch (error) {
+    console.error("Error fetching vendor profile settings:", error);
+    res.status(500).json({ message: 'Server error fetching profile' });
+  }
+};
+
+// --- Update Vendor Profile Settings ---
+exports.updateVendorProfileSettings = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { 
+      name, phone, businessName, serviceArea, serviceType, 
+      foodType, deliveryType, monthlyFee, halfTiffinMonthlyPrice, singleTiffinPrice 
+    } = req.body;
+
+    // 1. Update base user details
+    await User.findByIdAndUpdate(userId, { name, phone });
+
+    // 2. Update vendor business details
+    const updatedProfile = await VendorProfile.findOneAndUpdate(
+      { vendorId: userId },
+      { 
+        businessName, serviceArea, serviceType, foodType, 
+        deliveryType, monthlyFee, halfTiffinMonthlyPrice, singleTiffinPrice 
+      },
+      { new: true } // Returns the updated document
+    );
+
+    res.status(200).json({ message: 'Profile updated successfully!', profile: updatedProfile });
+
+  } catch (error) {
+    console.error("Error updating vendor profile:", error);
+    res.status(500).json({ message: 'Server error updating profile' });
+  }
+};
+
+// --- Get Payment Status (Unpaid vs Paid) ---
+exports.getPaymentRecords = async (req, res) => {
+  try {
+    const vendorProfile = await VendorProfile.findOne({ vendorId: req.user.userId });
+    if (!vendorProfile) return res.status(404).json({ message: 'Vendor profile not found' });
+
+    const activeSubs = await Subscription.find({ 
+      vendor: vendorProfile._id, 
+      status: 'active' 
+    }).populate('customer', 'name phone location roomNumber');
+
+    const unpaidCustomers = [];
+    const paidCustomers = [];
+    const today = new Date();
+
+    activeSubs.forEach(sub => {
+      if (!sub.customer) return;
+
+      let baseDuration = 30; 
+      if (sub.planType.includes('weekly') || sub.planType.includes('7_days')) baseDuration = 7;
+      if (sub.planType.includes('15_days')) baseDuration = 15;
+
+      const skippedDaysCount = sub.skippedDates ? sub.skippedDates.length : 0;
+      const totalSpan = baseDuration + skippedDaysCount;
+
+      const startDate = new Date(sub.startDate || sub.createdAt);
+      const endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + totalSpan);
+
+      const diffTime = endDate.getTime() - today.getTime();
+      const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      // Format the Exact Date and Time for the Receipt!
+      const formattedPaymentDate = sub.lastPaymentDate 
+        ? new Date(sub.lastPaymentDate).toLocaleString('en-IN', {
+            day: '2-digit', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit', hour12: true
+          }) 
+        : 'Not Paid Yet';
+
+      const customerData = {
+        id: sub._id,
+        name: sub.customer.name,
+        amount: sub.price,
+        hostel: sub.customer.location || 'N/A',
+        room: sub.customer.roomNumber || '',
+        phone: sub.customer.phone || '',
+        plan: `${sub.planType.replace('_', ' ')} (${sub.mealType})`,
+        leaves: skippedDaysCount,
+        daysLeft: daysLeft,
+        exactPaymentDate: formattedPaymentDate // Send the exact time to React
+      };
+
+      // NEW LOGIC: If they explicitly have 'unpaid' status OR they have 5 or fewer days left
+      if (sub.paymentStatus === 'unpaid' || daysLeft <= 5) {
+        let dueText = "Due soon";
+        
+        if (sub.paymentStatus === 'unpaid') dueText = "New Request (Unpaid)";
+        else if (daysLeft < 0) dueText = `Overdue by ${Math.abs(daysLeft)} Days`;
+        else if (daysLeft === 0) dueText = "Today";
+        else dueText = `In ${daysLeft} Days`;
+
+        unpaidCustomers.push({ ...customerData, due: dueText });
+      } else {
+        // They are Paid, Active, and have plenty of days left
+        paidCustomers.push({ 
+          ...customerData, 
+          date: customerData.exactPaymentDate, // This now contains Date + Time
+          method: "Cash / UPI" 
+        });
+      }
+    });
+
+    res.status(200).json({ unpaidCustomers, paidCustomers });
+  } catch (error) {
+    console.error("Error fetching payment records:", error);
+    res.status(500).json({ message: 'Server error fetching payments' });
+  }
+};
+
+// --- Mark Student as Paid (Renew Subscription) ---
+exports.markAsPaid = async (req, res) => {
+  try {
+    const { subscriptionId } = req.params;
+
+    const vendorProfile = await VendorProfile.findOne({ vendorId: req.user.userId });
+    if (!vendorProfile) {
+      return res.status(404).json({ message: 'Vendor profile not found' });
+    }
+
+    const subscription = await Subscription.findById(subscriptionId);
+    if (!subscription) {
+      return res.status(404).json({ message: 'Subscription not found' });
+    }
+
+    if (String(subscription.vendor) !== String(vendorProfile._id)) {
+      return res.status(403).json({ message: 'Unauthorized payment update request' });
+    }
+
+    if (subscription.status !== 'active') {
+      return res.status(400).json({ message: 'Only active subscriptions can be marked as paid' });
+    }
+
+    // Update payment status and renew plan window from now.
+    subscription.startDate = new Date();
+    subscription.skippedDates = [];
+    subscription.paymentStatus = 'paid';
+    subscription.lastPaymentDate = new Date();
+    const updatedSub = await subscription.save();
+
+    if (!updatedSub) return res.status(404).json({ message: 'Subscription not found' });
+
+    res.status(200).json({ message: 'Payment recorded successfully!' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error updating payment' });
+  }
+};

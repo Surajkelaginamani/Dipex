@@ -132,32 +132,38 @@ exports.updateHolidays = async (req, res) => {
     res.status(500).json({ error: "Server error while saving holidays" });
   }
 };
+// In controllers/customerController.js
 exports.getCustomerDashboard = async (req, res) => {
   try {
-    const customerId = req.user.userId || req.user.id; 
+    const customerId = req.user.userId || req.user.id;
 
-    // 1. Fetch the customer's active subscription (You probably already have this logic)
+    // Fetch the active subscription
     const activeSubscription = await Subscription.findOne({ 
-        customerId: customerId, 
+        customer: customerId, // ensure this matches your schema (customer vs customerId)
         status: 'active' 
-    }).populate('vendorId');
+    }).populate('vendor');
 
     let vendorAnnouncements = [];
+    let isUnpaid = false;
 
-    // 2. If they are subscribed to someone, fetch that vendor's announcements
     if (activeSubscription) {
+      // 1. Fetch announcements
       vendorAnnouncements = await Announcement.find({ 
-          vendorId: activeSubscription.vendorId._id 
-      })
-      .sort({ createdAt: -1 })
-      .limit(3); // Only grab the latest 3 so the ticker doesn't get ridiculously long
+          vendorId: activeSubscription.vendor._id 
+      }).sort({ createdAt: -1 }).limit(3);
+      
+      // 2. NEW: Check if the vendor marked them as unpaid!
+      // If it's explicitly 'unpaid', or if the field is missing (old data), flag it.
+      if (activeSubscription.paymentStatus === 'unpaid' || !activeSubscription.paymentStatus) {
+        isUnpaid = true;
+      }
     }
 
-    // 3. Send everything back to the frontend
     res.status(200).json({
       user: req.user,
       subscription: activeSubscription,
-      announcements: vendorAnnouncements, // <-- Add this to your existing response!
+      announcements: vendorAnnouncements,
+      hasPendingBill: isUnpaid, // Send the flag to the frontend!
       // ... stats, todaysMenu, etc.
     });
 
@@ -315,5 +321,100 @@ exports.getMySubscriptions = async (req, res) => {
   } catch (error) {
     console.error("Error fetching subscriptions:", error);
     res.status(500).json({ message: 'Server error fetching subscriptions' });
+  }
+};
+
+// In controllers/customerController.js
+
+// --- Get Customer Payment Details ---
+exports.getCustomerPayments = async (req, res) => {
+  try {
+    const customerId = req.user.userId || req.user.id;
+
+    // Fetch the active subscription for this customer
+    const activeSub = await Subscription.findOne({
+      customer: customerId,
+      status: 'active' 
+    }).populate('vendor', 'businessName');
+
+    if (!activeSub) {
+        return res.status(200).json({
+            pendingAmount: 0,
+            totalPaid: 0,
+            thisMonth: 0,
+            transactions: []
+        });
+    }
+
+    const today = new Date();
+    let baseDuration = 30;
+    if (activeSub.planType.includes('weekly') || activeSub.planType.includes('7_days')) baseDuration = 7;
+    if (activeSub.planType.includes('15_days')) baseDuration = 15;
+
+    const skippedDaysCount = activeSub.skippedDates ? activeSub.skippedDates.length : 0;
+    const totalSpan = baseDuration + skippedDaysCount;
+
+    const startDate = new Date(activeSub.startDate || activeSub.createdAt);
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + totalSpan);
+
+    const diffTime = endDate.getTime() - today.getTime();
+    const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    let pendingAmount = 0;
+    let transactions = [];
+
+    // Determine Pending Amount
+    if (activeSub.paymentStatus === 'unpaid' || daysLeft <= 5) {
+        pendingAmount = activeSub.price;
+        // Add a "Pending" transaction record
+        transactions.push({
+            id: `pending-${activeSub._id}`,
+            vendorName: activeSub.vendor.businessName,
+            type: 'Subscription',
+            status: 'pending',
+            date: 'Due Now',
+            method: 'Pending',
+            amount: activeSub.price
+        });
+    }
+
+    // Determine Total Paid & This Month (Simplification: Assuming if paid, they paid the price)
+    // In a real app, you'd have a separate 'Transactions' table. Here we infer from the subscription state.
+    let totalPaid = 0;
+    let thisMonthPaid = 0;
+
+    if (activeSub.paymentStatus === 'paid') {
+        totalPaid += activeSub.price;
+        
+        // Check if paid this month
+        const paymentDate = activeSub.lastPaymentDate ? new Date(activeSub.lastPaymentDate) : startDate;
+        if (paymentDate.getMonth() === today.getMonth() && paymentDate.getFullYear() === today.getFullYear()) {
+            thisMonthPaid += activeSub.price;
+        }
+
+        // Add a "Paid" transaction record
+        const formattedDate = paymentDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        transactions.push({
+            id: `paid-${activeSub._id}`,
+            vendorName: activeSub.vendor.businessName,
+            type: 'Subscription',
+            status: 'paid',
+            date: formattedDate,
+            method: 'UPI / Cash', // Mock method
+            amount: activeSub.price
+        });
+    }
+
+    res.status(200).json({
+      pendingAmount,
+      totalPaid,
+      thisMonth: thisMonthPaid,
+      transactions
+    });
+
+  } catch (error) {
+    console.error("Error fetching customer payments:", error);
+    res.status(500).json({ message: 'Server error fetching payments' });
   }
 };

@@ -16,32 +16,27 @@ const CustomerDashboard = () => {
   const [hasPendingBill, setHasPendingBill] = useState(false); // Default to false until we build billing
   const [isSkippedToday, setIsSkippedToday] = useState(false);
 
-  // --- 2. FETCH DATA ON LOAD ---
+// --- CustomerDashboard.jsx (Inside the useEffect) ---
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
         const token = localStorage.getItem('token');
-        
-        // If no token, kick them to login
-        if (!token) {
-          navigate('/login');
-          return;
-        }
+        if (!token) return navigate('/login');
 
         const response = await fetch('http://localhost:5000/api/customer/dashboard', {
           method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
+          headers: { 'Authorization': `Bearer ${token}` }
         });
 
         const data = await response.json();
 
         if (response.ok) {
           setDashboardData(data);
+          
+          // NEW: Read the flag from the backend! 
+          setHasPendingBill(data.hasPendingBill); 
+          
         } else {
-          // Token might be expired
           localStorage.removeItem('token');
           navigate('/login');
         }
@@ -54,7 +49,6 @@ const CustomerDashboard = () => {
 
     fetchDashboard();
   }, [navigate]);
-
   // Show a loading screen while waiting for the backend
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen"><p className="text-gray-500 font-bold">Loading your dashboard...</p></div>;

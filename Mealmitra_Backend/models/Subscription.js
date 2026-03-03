@@ -25,6 +25,14 @@ const subscriptionSchema = new mongoose.Schema({
   skippedDates: {
     type: [String],
     default: []
+  },
+paymentStatus: { 
+    type: String, 
+    enum: ['unpaid', 'paid'], 
+    default: 'unpaid' // Default is unpaid so they don't show up in the paid list automatically!
+  },
+  lastPaymentDate: { 
+    type: Date 
   }
 
 }, { timestamps: true });

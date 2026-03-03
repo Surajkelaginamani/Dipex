@@ -36,6 +36,7 @@ import Analytics from './Pages/Vendors_Dashboard_components/Analytics.jsx'
 // --- Security ---
 import ProtectedRoute from './components/ProtectedRoute.jsx' // Make sure this path is correct based on where you save it!
 import VendorDetailsPage from './Pages/Customer_Dashboard_Pages/VendorDetailsPage.jsx'
+import VendorProfilePage from './Pages/Vendors_Dashboard_components/VendorProfilePage.jsx'
 
 const App = () => {
   return (
@@ -86,8 +87,9 @@ const App = () => {
           <Route path="/CustomerDirectory" element={<CustomerDirectory/>} />
           <Route path="/Add" element={<AddExtraProduct/>} />
           <Route path="/analytics" element={<Analytics/>}/>
+           <Route path="/vendor-profile" element={<VendorProfilePage/>}/>
         </Route>
-
+     
       </Routes>
     </div>
   )

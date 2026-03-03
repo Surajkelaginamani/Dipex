@@ -16,5 +16,9 @@ router.get('/communications', authMiddleware, vendorController.getCommunicationD
 router.put('/update-menu', authMiddleware, vendorController.updateWeeklyMenu);
 router.post('/post-announcement', authMiddleware, vendorController.postAnnouncement);
 router.get('/deliveries/today', authMiddleware, vendorController.getDailyDeliveryList);
-
+// Vendor Profile Settings Routes
+router.get('/profile', authMiddleware, vendorController.getVendorProfileSettings);
+router.put('/profile', authMiddleware, vendorController.updateVendorProfileSettings);
+router.get('/payments', authMiddleware, vendorController.getPaymentRecords);
+router.put('/payments/:subscriptionId/mark-paid', authMiddleware, vendorController.markAsPaid);
 module.exports = router;
